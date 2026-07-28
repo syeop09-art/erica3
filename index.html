@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>고교학점제 스마트 스케줄러 & AI 컨설팅</title>
+  <!-- 마크다운 표 파싱 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Firebase SDK 모듈 로드 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAvsl3_OsEKy7wNwYziSWrWSqL1UwbS1D0",
+      authDomain: "erica-2b744.firebaseapp.com",
+      projectId: "erica-2b744",
+      storageBucket: "erica-2b744.firebasestorage.app",
+      messagingSenderId: "678676020220",
+      appId: "1:678676020220:web:38380f18a5321701e51079",
+      measurementId: "G-0NZ3DFMHEV"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadFeedbacks() {
+      const listContainer = document.getElementById('feedbackList');
+      if (!listContainer) return;
+      listContainer.innerHTML = '<p class="loading-text">의견 목록을 불러오는 중...</p>';
+      try {
+        const q = query(collection(db, "feedbacks"), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+          listContainer.innerHTML = '<p class="empty-text">아직 작성된 의견이 없습니다. 첫 의견을 남겨보세요!</p>';
+          return;
+        }
+        let htmlContent = '';
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const dateStr = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString('ko-KR') : '방금 전';
+          htmlContent += `
+            <div class="feedback-card">
+              <div class="feedback-header">
+                <span class="feedback-author">${escapeHtml(data.author || '익명')}</span>
+                <span class="feedback-date">${dateStr}</span>
+              </div>
+              <div class="feedback-content">${escapeHtml(data.content)}</div>
+            </div>
+          `;
+        });
+        listContainer.innerHTML = htmlContent;
+      } catch (err) {
+        console.error("Firestore 불러오기 오류:", err);
+        listContainer.innerHTML = '<p class="error-text">의견 목록을 불러오지 못했습니다. Firebase 설정을 확인해주세요.</p>';
+      }
+    }
+
+    async function submitFeedback() {
+      const authorInput = document.getElementById('feedbackAuthor');
+      const contentInput = document.getElementById('feedbackContent');
+      const submitBtn = document.getElementById('feedbackSubmitBtn');
+      const author = authorInput ? authorInput.value.trim() : '';
+      const content = contentInput ? contentInput.value.trim() : '';
+
+      if (!content) { alert('의견 내용을 입력해 주세요.'); return; }
+      submitBtn.disabled = true; submitBtn.innerText = '등록 중...';
+
+      try {
+        await addDoc(collection(db, "feedbacks"), {
+          author: author || '익명',
+          content: content,
+          createdAt: serverTimestamp()
+        });
+        contentInput.value = '';
+        alert('의견이 성공적으로 등록되었습니다!');
+        await loadFeedbacks();
+      } catch (err) {
+        console.error("Firestore 저장 오류:", err);
+        alert('의견 등록 중 오류가 발생했습니다: ' + err.message);
+      } finally {
+        submitBtn.disabled = false; submitBtn.innerText = '의견 등록하기';
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    window.submitFeedback = submitFeedback;
+    window.addEventListener('DOMContentLoaded', loadFeedbacks);
+  </script>
+
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #1a1a1a;
+      --gray-light: #f5f5f5;
+      --gray-medium: #cccccc;
+      --gray-dark: #333333;
+      --accent-color: #000000;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      background-color: var(--gray-light);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--bg-color);
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    h1, h2, h3 { color: var(--accent-color); }
+    h1 { border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; }
+
+    /* 상단 입력창 */
+    .input-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+      padding-bottom: 30px;
+      border-bottom: 2px solid var(--accent-color);
+    }
+    .input-group { display: flex; flex-direction: column; }
+    .input-group label { font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+    .input-group input, .input-group select, .input-group textarea {
+      padding: 10px; border: 1px solid var(--gray-medium); border-radius: 4px; font-size: 1em; width: 100%; box-sizing: border-box;
+    }
+    .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: var(--accent-color); }
+    .input-group textarea { height: 80px; resize: vertical; }
+    
+    button {
+      background-color: var(--accent-color); color: var(--bg-color); border: none; padding: 15px;
+      font-size: 1.1em; font-weight: bold; border-radius: 4px; cursor: pointer; transition: background 0.3s;
+    }
+    button:hover { background-color: var(--gray-dark); }
+    button:disabled { background-color: var(--gray-medium); cursor: not-allowed; }
+    .full-width-btn { grid-column: 1 / -1; width: 100%; }
+
+    /* 하단 출력창 */
+    .output-section { display: none; margin-top: 20px; }
+    .section-block { background: var(--bg-color); border: 1px solid var(--gray-medium); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .middle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* 타이머 & 시간표 등 기본 스타일 유지 */
+    .timer-container { text-align: center; padding: 30px; background: var(--gray-light); border-radius: 8px; border: 1px solid var(--gray-medium); }
+    .timer-display { font-size: 4em; font-weight: bold; font-variant-numeric: tabular-nums; margin: 20px 0; color: var(--accent-color); }
+    .timer-controls button { width: auto; padding: 10px 20px; margin: 0 5px; font-size: 1em; }
+    .recommendations-container { background: var(--gray-light); padding: 20px; border-radius: 8px; border: 1px solid var(--gray-medium); }
+    .recommendations-list { padding-left: 20px; }
+    .timetable-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 0.85em; }
+    th, td { border: 1px solid var(--gray-medium); padding: 8px; text-align: center; }
+    th { background-color: var(--gray-dark); color: var(--bg-color); position: sticky; top: 0; }
+    td:first-child { font-weight: bold; background-color: var(--gray-light); }
+    .loader { text-align: center; display: none; margin: 20px 0; font-weight: bold; color: var(--gray-dark); }
+
+    /* AI 컨설팅 및 게시판 스타일 */
+    .consulting-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .response-box { background: var(--gray-light); border: 1px solid var(--gray-medium); padding: 20px; border-radius: 8px; line-height: 1.6; min-height: 100px; margin-top: 15px; overflow-x: auto; }
+    .response-box table { margin: 16px 0; }
+    .response-box th { background-color: var(--accent-color); }
+    .feedback-form { background: var(--gray-light); padding: 20px; border-radius: 8px; border: 1px solid var(--gray-medium); margin-bottom: 20px; }
+    .feedback-list { display: flex; flex-direction: column; gap: 12px; }
+    .feedback-card { background: var(--bg-color); border: 1px solid var(--gray-medium); border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .feedback-header { display: flex; justify-content: space-between; font-size: 14px; color: var(--gray-dark); margin-bottom: 8px; border-bottom: 1px solid var(--gray-medium); padding-bottom: 6px; }
+    .feedback-author { font-weight: bold; color: var(--accent-color); }
+    .feedback-content { white-space: pre-wrap; font-size: 15px; color: var(--text-color); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>고교학점제 맞춤형 AI 스케줄러 & 로드맵</h1>
+    
+    <!-- 상단: 스케줄러 입력창 -->
+    <div class="input-section">
+      <div class="input-group">
+        <label for="major">지망 학과</label>
+        <input type="text" id="major" placeholder="예: 컴퓨터공학과">
+      </div>
+      <div class="input-group">
+        <label for="sleepTime">취침 시간</label>
+        <input type="time" id="sleepTime" value="00:00">
+      </div>
+      <div class="input-group">
+        <label for="wakeTime">기상 시간</label>
+        <input type="time" id="wakeTime" value="07:00">
+      </div>
+      <div class="input-group">
+        <label for="academy">학원 시간표 (요일 및 시간)</label>
+        <input type="text" id="academy" placeholder="예: 월수금 19시~21시 수학학원">
+      </div>
+      <button class="full-width-btn" id="generateBtn" onclick="generateSchedule()">시간표 생성하기</button>
+    </div>
+
+    <div class="loader" id="loader">AI가 맞춤형 스케줄을 설계하고 있습니다. 잠시만 기다려주세요...</div>
+
+    <!-- 하단: 출력창 -->
+    <div class="output-section" id="outputSection">
+      
+      <!-- 1. 시험기간 시간표 -->
+      <div class="section-block">
+        <h2>🗓️ 시험기간 상세 시간표 (24시간)</h2>
+        <div class="timetable-wrapper" id="examTimetable"></div>
+      </div>
+
+      <!-- 2. 타이머 & 생기부 추천 -->
+      <div class="middle-grid section-block">
+        <div class="timer-container">
+          <h3>⏱️ 뽀모도로 타이머</h3>
+          <div class="timer-display" id="timeDisplay">50:00</div>
+          <div class="timer-controls">
+            <button onclick="startTimer()">시작</button>
+            <button onclick="pauseTimer()">일시정지</button>
+            <button onclick="resetTimer()">초기화</button>
+          </div>
+        </div>
+        <div class="recommendations-container">
+          <h3>📝 학과 맞춤 단기 생기부 추천</h3>
+          <ul class="recommendations-list" id="recommendationsList"></ul>
+        </div>
+      </div>
+
+      <!-- 3. 방학기간 시간표 -->
+      <div class="section-block">
+        <h2>🌴 방학기간 상세 시간표 (24시간)</h2>
+        <div class="timetable-wrapper" id="vacationTimetable"></div>
+      </div>
+
+      <!-- 4. [NEW] 팀원이 만든 AI 컨설팅 및 Q&A 기능 통합 -->
+      <div class="section-block">
+        <h2>🎓 고등학교 로드맵 AI 딥 컨설팅 & Q&A</h2>
+        <p style="color: var(--gray-dark); margin-bottom: 20px;">위에서 생성한 시간표 외에, 장기적인 학업 로드맵이나 맞춤형 공부법을 AI에게 물어보세요.</p>
+        
+        <div class="consulting-grid">
+          <div class="input-group">
+            <label for="grade">학년 선택</label>
+            <select id="grade">
+              <option value="1학년">1학년</option>
+              <option value="2학년">2학년</option>
+              <option value="3학년">3학년</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="academicLevel">학습 / 성적 수준</label>
+            <select id="academicLevel">
+              <option value="상위권 (1~2등급)">상위권 (1~2등급)</option>
+              <option value="중위권 (3~4등급)" selected>중위권 (3~4등급)</option>
+              <option value="하위권 (5등급 이하)">하위권 (5등급 이하)</option>
+              <option value="기초 다지기 필요">기초 다지기 필요</option>
+            </select>
+          </div>
+          <div class="input-group" style="grid-column: 1 / -1;">
+            <label for="userGoals">학습 및 활동 목표</label>
+            <textarea id="userGoals" placeholder="목표 내신 등급, 동아리 활동, 탐구 주제 등 원하는 내용을 적어주세요."></textarea>
+          </div>
+          <div class="input-group" style="grid-column: 1 / -1;">
+            <label for="questionInput">구체적인 질문 또는 요청사항</label>
+            <textarea id="questionInput" placeholder="성적대별 추천 공부법, 학업 로드맵, 희망 전공 관련 질문 등을 입력해 주세요."></textarea>
+          </div>
+        </div>
+        <button class="full-width-btn" id="submitConsultBtn" onclick="askQuestion()">답변 / 로드맵 생성 요청하기</button>
+        <div id="responseBox" class="response-box">질문이나 요청사항을 입력하신 후 버튼을 눌러주세요.</div>
+
+        <!-- 팀원의 의견 게시판 (Firebase) -->
+        <h3 style="margin-top: 40px; border-top: 2px dashed var(--gray-medium); padding-top: 20px;">🗣️ 익명 의견 게시판</h3>
+        <div class="feedback-form">
+          <div class="input-group" style="margin-bottom: 10px;">
+            <label for="feedbackAuthor">작성자 (선택)</label>
+            <input type="text" id="feedbackAuthor" placeholder="이름 또는 닉네임 (미입력 시 익명)">
+          </div>
+          <div class="input-group" style="margin-bottom: 10px;">
+            <label for="feedbackContent">의견 내용</label>
+            <textarea id="feedbackContent" placeholder="앱 사용 후기나 개선 요청사항을 자유롭게 작성해 주세요."></textarea>
+          </div>
+          <button class="full-width-btn" id="feedbackSubmitBtn" onclick="submitFeedback()">의견 등록하기</button>
+        </div>
+        <div id="feedbackList" class="feedback-list"></div>
+      </div>
+      <!-- 4번째 섹션 끝 -->
+
+    </div>
+  </div>
+
+  <script>
+    // --- [1] 스케줄러 로직 ---
+    async function generateSchedule() {
+      const major = document.getElementById('major').value;
+      const sleepTime = document.getElementById('sleepTime').value;
+      const wakeTime = document.getElementById('wakeTime').value;
+      const academy = document.getElementById('academy').value;
+
+      if (!major || !academy) { alert("지망 학과와 학원 시간표를 입력해주세요."); return; }
+
+      document.getElementById('generateBtn').disabled = true;
+      document.getElementById('loader').style.display = 'block';
+      document.getElementById('outputSection').style.display = 'none';
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ major, sleepTime, wakeTime, academy })
+        });
+        const data = await response.json();
+        
+        renderTimetable(data.examSchedule, 'examTimetable');
+        document.getElementById('recommendationsList').innerHTML = data.recommendations.map(r => `<li>${r}</li>`).join('');
+        renderTimetable(data.vacationSchedule, 'vacationTimetable');
+        
+        document.getElementById('outputSection').style.display = 'block';
+      } catch (error) {
+        alert("시간표 생성 중 오류가 발생했습니다.");
+      } finally {
+        document.getElementById('generateBtn').disabled = false;
+        document.getElementById('loader').style.display = 'none';
+      }
+    }
+
+    function renderTimetable(scheduleDict, containerId) {
+      const days = ['월', '화', '수', '목', '금', '토', '일'];
+      let html = '<table><thead><tr><th>시간</th>';
+      days.forEach(day => html += `<th>${day}</th>`);
+      html += '</tr></thead><tbody>';
+      for (let hour = 0; hour < 24; hour++) {
+        html += `<tr><td>${hour.toString().padStart(2, '0')}:00</td>`;
+        days.forEach(day => {
+          const task = scheduleDict[day] && scheduleDict[day][hour] ? scheduleDict[day][hour] : '-';
+          html += `<td>${task}</td>`;
+        });
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById(containerId).innerHTML = html;
+    }
+
+    // --- [2] 타이머 로직 ---
+    let timerInterval, timeLeft = 50 * 60, isWorking = true, isRunning = false;
+    function updateTimerDisplay() {
+      document.getElementById('timeDisplay').innerText = 
+        `${Math.floor(timeLeft / 60).toString().padStart(2, '0')}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+    }
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      timerInterval = setInterval(() => {
+        if (timeLeft > 0) { timeLeft--; updateTimerDisplay(); } 
+        else {
+          isWorking = !isWorking; timeLeft = isWorking ? 50 * 60 : 10 * 60;
+          alert(isWorking ? "휴식 끝! 다시 집중해봅시다." : "수고하셨습니다! 10분간 휴식하세요.");
+          updateTimerDisplay();
+        }
+      }, 1000);
+    }
+    function pauseTimer() { clearInterval(timerInterval); isRunning = false; }
+    function resetTimer() { clearInterval(timerInterval); isRunning = false; isWorking = true; timeLeft = 50 * 60; updateTimerDisplay(); }
+
+    // --- [3] 팀원이 만든 AI 컨설팅 로직 ---
+    async function askQuestion() {
+      const grade = document.getElementById('grade').value;
+      const academicLevel = document.getElementById('academicLevel').value;
+      const targetMajor = document.getElementById('major').value || '미정'; 
+      const userGoals = document.getElementById('userGoals').value.trim();
+      const question = document.getElementById('questionInput').value.trim();
+
+      const responseBox = document.getElementById('responseBox');
+      const submitBtn = document.getElementById('submitConsultBtn');
+
+      if (!question && !userGoals) { alert('질문이나 목표를 입력해주세요.'); return; }
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = '답변 작성 중...';
+      responseBox.innerText = 'Gemini AI가 깊이 있는 컨설팅 답변을 작성하고 있습니다...';
+
+      try {
+        const res = await fetch('/api/consult', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grade, academicLevel, targetMajor, userGoals, question }),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          responseBox.innerHTML = marked.parse(data.answer);
+        } else {
+          responseBox.innerText = `오류 발생: ${data.error}`;
+        }
+      } catch (err) {
+        responseBox.innerText = '서버 통신 중 오류가 발생했습니다.';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = '답변 / 로드맵 생성 요청하기';
+      }
+    }
+  </script>
+</body>
+</html>
